@@ -206,29 +206,33 @@ def main():
         anomaly_df = anomalies.copy()
         
         # Create scatter plot for anomalies
-        fig_timeline = px.scatter(
-            anomaly_df,
-            x='date',
-            y='cost',
-            color='severity',
-            size='z_score',
-            hover_data=['service', 'description'],
-            title="Anomaly Timeline",
-            color_discrete_map={
-                'High': '#dc3545',
-                'Medium': '#ffc107',
-                'Low': '#17a2b8'
-            }
-        )
-        
-        # Add baseline costs as a line
-        fig_timeline.add_scatter(
-            x=anomaly_df['date'],
-            y=anomaly_df['cost'] * 0.9,  # Approximate baseline as 90% of cost
-            mode='lines',
-            name='Baseline',
-            line=dict(color='green', dash='dash')
-        )
+        if len(anomaly_df) > 0:
+            fig_timeline = px.scatter(
+                anomaly_df,
+                x='date',
+                y='cost',
+                color='severity',
+                title="Anomaly Timeline",
+                color_discrete_map={
+                    'High': '#dc3545',
+                    'Medium': '#ffc107',
+                    'Low': '#17a2b8'
+                }
+            )
+            
+            # Add baseline costs as a line
+            fig_timeline.add_scatter(
+                x=anomaly_df['date'],
+                y=anomaly_df['cost'] * 0.9,  # Approximate baseline as 90% of cost
+                mode='lines',
+                name='Baseline',
+                line=dict(color='green', dash='dash')
+            )
+        else:
+            # Create empty chart if no anomalies
+            fig_timeline = px.scatter(
+                title="Anomaly Timeline - No anomalies detected"
+            )
         
         fig_timeline.update_layout(height=400)
         st.plotly_chart(fig_timeline, use_container_width=True)
