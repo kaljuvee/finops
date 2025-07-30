@@ -51,8 +51,9 @@ def main():
     st.title("📊 Cost Monitoring & Visualization")
     st.markdown("Real-time AWS cost monitoring and analysis dashboard")
     
-    # Initialize cost monitor
-    cost_monitor = CostMonitor()
+    # Generate sample data
+    cost_data = generate_cost_data(30)
+    service_breakdown = generate_service_breakdown()
     
     # Sidebar filters
     with st.sidebar:

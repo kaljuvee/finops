@@ -73,8 +73,19 @@ def main():
     st.title("🚨 Anomaly Detection & Alerts")
     st.markdown("Real-time cost anomaly detection and alerting system")
     
-    # Initialize anomaly detector
-    anomaly_detector = AnomalyDetector()
+    # Generate sample data for anomaly detection
+    cost_data = generate_cost_data(90)  # 90 days of data
+    
+    # Simple anomaly detection using statistical methods
+    def detect_anomalies(data, threshold=2):
+        """Simple statistical anomaly detection using z-score"""
+        mean_cost = data['cost'].mean()
+        std_cost = data['cost'].std()
+        data['z_score'] = (data['cost'] - mean_cost) / std_cost
+        data['is_anomaly'] = abs(data['z_score']) > threshold
+        return data
+    
+    cost_data = detect_anomalies(cost_data)
     
     # Sidebar for configuration
     with st.sidebar:
@@ -135,22 +146,31 @@ def main():
         if st.button("Run Detection Now"):
             st.success("Anomaly detection initiated!")
     
-    # Generate sample data
-    anomalies = generate_anomaly_data()
-    cost_data = generate_cost_trend_data(30)
+    # Generate sample anomaly data
+    anomalies = cost_data[cost_data['is_anomaly']].copy()
+    anomalies['severity'] = anomalies['z_score'].apply(
+        lambda x: 'High' if abs(x) > 3 else 'Medium' if abs(x) > 2.5 else 'Low'
+    )
+    anomalies['service'] = np.random.choice(['Amazon EC2', 'Amazon S3', 'AWS Lambda', 'Amazon RDS'], len(anomalies))
+    anomalies['description'] = anomalies.apply(
+        lambda row: f"Cost spike detected in {row['service']}: ${row['cost']:.2f} (Z-score: {row['z_score']:.2f})", 
+        axis=1
+    )
     
     # Summary metrics
     col1, col2, col3, col4 = st.columns(4)
     
-    active_anomalies = len([a for a in anomalies if a['status'] == 'Active'])
-    high_severity = len([a for a in anomalies if a['severity'] == 'High'])
-    total_impact = sum(abs(a['actual_cost'] - a['baseline_cost']) for a in anomalies)
+    total_anomalies = len(anomalies)
+    high_severity = len(anomalies[anomalies['severity'] == 'High'])
+    medium_severity = len(anomalies[anomalies['severity'] == 'Medium'])
+    low_severity = len(anomalies[anomalies['severity'] == 'Low'])
+    total_impact = anomalies['cost'].sum() if len(anomalies) > 0 else 0
     
     with col1:
         st.metric(
-            label="🚨 Active Anomalies",
-            value=str(active_anomalies),
-            delta=f"+{active_anomalies} new"
+            label="🚨 Total Anomalies",
+            value=str(total_anomalies),
+            delta=f"Last 90 days"
         )
     
     with col2:
@@ -164,7 +184,7 @@ def main():
         st.metric(
             label="💰 Cost Impact",
             value=f"${total_impact:,.2f}",
-            delta="Last 24 hours"
+            delta="Anomalous costs"
         )
     
     with col4:
