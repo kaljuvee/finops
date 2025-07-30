@@ -223,8 +223,8 @@ def main():
         
         # Add baseline costs as a line
         fig_timeline.add_scatter(
-            x=anomaly_df['timestamp'],
-            y=anomaly_df['baseline_cost'],
+            x=anomaly_df['date'],
+            y=anomaly_df['cost'] * 0.9,  # Approximate baseline as 90% of cost
             mode='lines',
             name='Baseline',
             line=dict(color='green', dash='dash')
