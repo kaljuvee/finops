@@ -174,13 +174,13 @@ def main():
             yaxis_title="Cost ($)"
         )
         
-        fig.update_traces(
+        fig_trend.update_traces(
             line=dict(color='#007bff', width=3),
             fill='tonexty',
             fillcolor='rgba(0, 123, 255, 0.1)'
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_trend, use_container_width=True)
         
         # Add trend insights
         st.markdown("**📊 Trend Insights:**")
