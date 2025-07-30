@@ -10,8 +10,7 @@ import numpy as np
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
-from cost_monitor import CostMonitor
-from data_generator import generate_cost_trend_data, generate_service_breakdown
+from data_generator import generate_cost_data, generate_service_breakdown
 
 # Page configuration
 st.set_page_config(

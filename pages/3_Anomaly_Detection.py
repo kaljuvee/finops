@@ -10,8 +10,7 @@ import numpy as np
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
-from anomaly_detector import AnomalyDetector
-from data_generator import generate_anomaly_data, generate_cost_trend_data
+from data_generator import generate_cost_data, generate_multivariate_cost_data
 
 # Page configuration
 st.set_page_config(

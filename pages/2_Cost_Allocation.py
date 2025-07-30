@@ -9,7 +9,7 @@ import os
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
-from data_generator import generate_tag_allocation_data
+from data_generator import generate_cost_allocation_data, generate_tag_analysis_data
 
 # Page configuration
 st.set_page_config(
@@ -113,15 +113,20 @@ def main():
     
     # Main content
     # Generate sample allocation data
-    allocation_data = generate_tag_allocation_data()
+    allocation_data = generate_cost_allocation_data()
+    tag_data = generate_tag_analysis_data()
+    
+    # Convert to DataFrame for easier processing
+    allocation_df = pd.DataFrame(allocation_data)
+    tag_df = pd.DataFrame(tag_data)
     
     # Summary metrics
     col1, col2, col3, col4 = st.columns(4)
     
-    total_allocated = allocation_data['Cost'].sum()
-    environment_costs = allocation_data[allocation_data['Tag_Type'] == 'Environment']['Cost'].sum()
-    team_costs = allocation_data[allocation_data['Tag_Type'] == 'Team']['Cost'].sum()
-    project_costs = allocation_data[allocation_data['Tag_Type'] == 'Project']['Cost'].sum()
+    total_allocated = allocation_df['cost'].sum()
+    dept_count = allocation_df['department'].nunique()
+    project_count = allocation_df['project'].nunique()
+    avg_project_cost = allocation_df.groupby('project')['cost'].sum().mean()
     
     with col1:
         st.metric(
@@ -132,22 +137,22 @@ def main():
     
     with col2:
         st.metric(
-            label="🌍 Environment Allocation",
-            value=f"${environment_costs:,.2f}",
-            delta="4 environments"
+            label="🏢 Departments",
+            value=f"{dept_count}",
+            delta="Active departments"
         )
     
     with col3:
         st.metric(
-            label="👥 Team Allocation",
-            value=f"${team_costs:,.2f}",
-            delta="5 teams"
+            label="📊 Projects",
+            value=f"{project_count}",
+            delta="Active projects"
         )
     
     with col4:
         st.metric(
-            label="📊 Project Allocation",
-            value=f"${project_costs:,.2f}",
+            label="📈 Avg Project Cost",
+            value=f"${avg_project_cost:,.2f}",
             delta="4 projects"
         )
     
@@ -212,177 +217,173 @@ def main():
     # Cost allocation analysis
     st.subheader("💰 Cost Allocation Analysis")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["🌍 Environment", "👥 Team", "📊 Project", "🏢 Cost Center"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🏢 Department", "📊 Project", "🏷️ Tag Analysis", "💼 Cost Center"])
     
     with tab1:
-        st.markdown("**Environment-based Cost Allocation**")
-        
-        env_data = allocation_data[allocation_data['Tag_Type'] == 'Environment'].copy()
+        st.markdown("**Department-based Cost Allocation**")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            # Environment pie chart
-            fig_env = px.pie(
-                env_data,
-                values='Cost',
-                names='Tag_Value',
-                title="Cost Distribution by Environment"
+            # Department pie chart
+            dept_costs = allocation_df.groupby('department')['cost'].sum().reset_index()
+            fig_dept = px.pie(
+                dept_costs,
+                values='cost',
+                names='department',
+                title="Cost Distribution by Department"
             )
-            st.plotly_chart(fig_env, use_container_width=True)
+            st.plotly_chart(fig_dept, use_container_width=True)
         
         with col2:
-            # Environment cost breakdown
-            env_data['Monthly Budget'] = [8000, 2500, 1500, 1000]
-            env_data['Budget Utilization'] = (env_data['Cost'] / env_data['Monthly Budget']) * 100
-            env_data['Status'] = env_data['Budget Utilization'].apply(
+            # Department cost breakdown
+            dept_summary = allocation_df.groupby('department').agg({
+                'cost': 'sum',
+                'budget': 'sum',
+                'project': 'count'
+            }).reset_index()
+            dept_summary['utilization'] = (dept_summary['cost'] / dept_summary['budget']) * 100
+            dept_summary['status'] = dept_summary['utilization'].apply(
                 lambda x: '🟢 On Track' if x < 80 else '🟡 At Risk' if x < 100 else '🔴 Over Budget'
             )
             
             st.dataframe(
-                env_data[['Tag_Value', 'Cost', 'Monthly Budget', 'Budget Utilization', 'Status']],
+                dept_summary,
                 use_container_width=True,
                 column_config={
-                    'Tag_Value': 'Environment',
-                    'Cost': st.column_config.NumberColumn('Current Cost ($)', format='$%.2f'),
-                    'Monthly Budget': st.column_config.NumberColumn('Budget ($)', format='$%.2f'),
-                    'Budget Utilization': st.column_config.NumberColumn('Utilization (%)', format='%.1f%%')
+                    'department': 'Department',
+                    'cost': st.column_config.NumberColumn('Current Cost ($)', format='$%.2f'),
+                    'budget': st.column_config.NumberColumn('Budget ($)', format='$%.2f'),
+                    'project': 'Projects',
+                    'utilization': st.column_config.NumberColumn('Utilization (%)', format='%.1f%%'),
+                    'status': 'Status'
                 }
             )
-        
-        # Environment trends
-        st.markdown("**📈 Environment Cost Trends**")
-        
-        # Mock trend data
-        dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
-        trend_data = []
-        
-        for env in env_data['Tag_Value']:
-            base_cost = env_data[env_data['Tag_Value'] == env]['Cost'].iloc[0] / 30
-            for date in dates:
-                variation = np.random.uniform(0.8, 1.2)
-                trend_data.append({
-                    'Date': date,
-                    'Environment': env,
-                    'Daily Cost': base_cost * variation
-                })
-        
-        trend_df = pd.DataFrame(trend_data)
-        
-        fig_trend = px.line(
-            trend_df,
-            x='Date',
-            y='Daily Cost',
-            color='Environment',
-            title="Daily Cost Trends by Environment"
-        )
-        
-        st.plotly_chart(fig_trend, use_container_width=True)
     
     with tab2:
-        st.markdown("**Team-based Cost Allocation**")
-        
-        team_data = allocation_data[allocation_data['Tag_Type'] == 'Team'].copy()
-        
-        # Team allocation sunburst chart
-        fig_sunburst = px.sunburst(
-            team_data,
-            path=['Tag_Type', 'Tag_Value'],
-            values='Cost',
-            title="Team Cost Allocation"
-        )
-        
-        st.plotly_chart(fig_sunburst, use_container_width=True)
-        
-        # Team performance metrics
-        team_data['Team Lead'] = ['Alice Johnson', 'Bob Smith', 'Carol Davis', 'David Wilson', 'Eva Brown']
-        team_data['Resources'] = [25, 18, 22, 15, 12]
-        team_data['Cost per Resource'] = team_data['Cost'] / team_data['Resources']
-        team_data['Efficiency Score'] = np.random.uniform(7.5, 9.5, len(team_data))
-        
-        st.markdown("**👥 Team Performance Dashboard**")
-        
-        st.dataframe(
-            team_data[['Tag_Value', 'Team Lead', 'Cost', 'Resources', 'Cost per Resource', 'Efficiency Score']],
-            use_container_width=True,
-            column_config={
-                'Tag_Value': 'Team',
-                'Cost': st.column_config.NumberColumn('Total Cost ($)', format='$%.2f'),
-                'Cost per Resource': st.column_config.NumberColumn('Cost/Resource ($)', format='$%.2f'),
-                'Efficiency Score': st.column_config.NumberColumn('Efficiency', format='%.1f/10')
-            }
-        )
-    
-    with tab3:
         st.markdown("**Project-based Cost Allocation**")
         
-        project_data = allocation_data[allocation_data['Tag_Type'] == 'Project'].copy()
-        
-        # Project timeline and costs
-        project_data['Start Date'] = ['2024-01-15', '2024-02-01', '2024-03-10', '2024-01-01']
-        project_data['End Date'] = ['2024-06-30', '2024-08-15', '2024-12-31', '2024-12-31']
-        project_data['Status'] = ['Active', 'Active', 'Planning', 'Ongoing']
-        project_data['Progress'] = [65, 40, 15, 80]
+        project_summary = allocation_df.groupby('project').agg({
+            'cost': 'sum',
+            'budget': 'sum',
+            'department': 'first'
+        }).reset_index()
+        project_summary['variance'] = ((project_summary['cost'] - project_summary['budget']) / project_summary['budget']) * 100
         
         col1, col2 = st.columns(2)
         
         with col1:
             # Project cost comparison
             fig_project = px.bar(
-                project_data,
-                x='Tag_Value',
-                y='Cost',
-                color='Status',
-                title="Project Costs by Status"
+                project_summary,
+                x='project',
+                y='cost',
+                color='department',
+                title="Project Costs by Department"
             )
             st.plotly_chart(fig_project, use_container_width=True)
         
         with col2:
-            # Project progress vs cost
-            fig_progress = px.scatter(
-                project_data,
-                x='Progress',
-                y='Cost',
-                size='Cost',
-                color='Tag_Value',
-                title="Project Progress vs Cost",
-                labels={'Progress': 'Progress (%)', 'Cost': 'Cost ($)'}
+            # Project variance analysis
+            fig_variance = px.scatter(
+                project_summary,
+                x='budget',
+                y='cost',
+                size='cost',
+                color='department',
+                title="Budget vs Actual Cost by Project",
+                labels={'budget': 'Budget ($)', 'cost': 'Actual Cost ($)'}
             )
-            st.plotly_chart(fig_progress, use_container_width=True)
+            # Add diagonal line for perfect budget adherence
+            fig_variance.add_shape(
+                type="line",
+                x0=project_summary['budget'].min(),
+                y0=project_summary['budget'].min(),
+                x1=project_summary['budget'].max(),
+                y1=project_summary['budget'].max(),
+                line=dict(dash="dash", color="red")
+            )
+            st.plotly_chart(fig_variance, use_container_width=True)
         
         # Project details table
         st.dataframe(
-            project_data[['Tag_Value', 'Cost', 'Start Date', 'End Date', 'Status', 'Progress']],
+            project_summary,
             use_container_width=True,
             column_config={
-                'Tag_Value': 'Project',
-                'Cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
-                'Progress': st.column_config.ProgressColumn('Progress', min_value=0, max_value=100)
+                'project': 'Project',
+                'cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
+                'budget': st.column_config.NumberColumn('Budget ($)', format='$%.2f'),
+                'variance': st.column_config.NumberColumn('Variance (%)', format='%.1f%%'),
+                'department': 'Department'
+            }
+        )
+    
+    with tab3:
+        st.markdown("**Tag-based Analysis**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Tag distribution
+            tag_summary = tag_df.groupby('tag_key').agg({
+                'cost': 'sum',
+                'resource_count': 'sum'
+            }).reset_index()
+            
+            fig_tags = px.bar(
+                tag_summary,
+                x='tag_key',
+                y='cost',
+                title="Cost Distribution by Tag Category"
+            )
+            st.plotly_chart(fig_tags, use_container_width=True)
+        
+        with col2:
+            # Resource efficiency by tag
+            fig_efficiency = px.scatter(
+                tag_df,
+                x='resource_count',
+                y='avg_cost_per_resource',
+                color='tag_key',
+                size='cost',
+                title="Resource Efficiency by Tag",
+                labels={'resource_count': 'Resource Count', 'avg_cost_per_resource': 'Avg Cost per Resource ($)'}
+            )
+            st.plotly_chart(fig_efficiency, use_container_width=True)
+        
+        # Tag details table
+        st.dataframe(
+            tag_df,
+            use_container_width=True,
+            column_config={
+                'tag_key': 'Tag Category',
+                'tag_value': 'Tag Value',
+                'cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
+                'resource_count': 'Resources',
+                'avg_cost_per_resource': st.column_config.NumberColumn('Avg Cost/Resource ($)', format='$%.2f'),
+                'percentage_of_total': st.column_config.NumberColumn('% of Total', format='%.1f%%')
             }
         )
     
     with tab4:
         st.markdown("**Cost Center Allocation**")
         
-        # Mock cost center data
-        cost_center_data = pd.DataFrame({
-            'Cost Center': ['Engineering', 'Marketing', 'Sales', 'Operations', 'R&D'],
-            'Budget': [15000, 8000, 5000, 12000, 10000],
-            'Actual': [14200, 7800, 4900, 11500, 9800],
-            'Variance': [-800, -200, -100, -500, -200],
-            'Department Head': ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Wilson', 'Tom Brown']
-        })
-        
-        cost_center_data['Variance %'] = (cost_center_data['Variance'] / cost_center_data['Budget']) * 100
-        cost_center_data['Status'] = cost_center_data['Variance %'].apply(
+        # Mock cost center data based on departments
+        cost_center_summary = allocation_df.groupby('department').agg({
+            'cost': 'sum',
+            'budget': 'sum'
+        }).reset_index()
+        cost_center_summary['variance'] = cost_center_summary['cost'] - cost_center_summary['budget']
+        cost_center_summary['variance_pct'] = (cost_center_summary['variance'] / cost_center_summary['budget']) * 100
+        cost_center_summary['status'] = cost_center_summary['variance_pct'].apply(
             lambda x: '🟢 Under Budget' if x < -5 else '🟡 On Track' if x < 5 else '🔴 Over Budget'
         )
         
         # Cost center performance
         fig_cc = px.bar(
-            cost_center_data,
-            x='Cost Center',
-            y=['Budget', 'Actual'],
+            cost_center_summary,
+            x='department',
+            y=['budget', 'cost'],
             title="Budget vs Actual by Cost Center",
             barmode='group'
         )
@@ -391,13 +392,15 @@ def main():
         
         # Cost center table
         st.dataframe(
-            cost_center_data,
+            cost_center_summary,
             use_container_width=True,
             column_config={
-                'Budget': st.column_config.NumberColumn('Budget ($)', format='$%.2f'),
-                'Actual': st.column_config.NumberColumn('Actual ($)', format='$%.2f'),
-                'Variance': st.column_config.NumberColumn('Variance ($)', format='$%.2f'),
-                'Variance %': st.column_config.NumberColumn('Variance (%)', format='%.1f%%')
+                'department': 'Cost Center',
+                'budget': st.column_config.NumberColumn('Budget ($)', format='$%.2f'),
+                'cost': st.column_config.NumberColumn('Actual ($)', format='$%.2f'),
+                'variance': st.column_config.NumberColumn('Variance ($)', format='$%.2f'),
+                'variance_pct': st.column_config.NumberColumn('Variance (%)', format='%.1f%%'),
+                'status': 'Status'
             }
         )
     
