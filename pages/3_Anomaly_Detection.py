@@ -203,16 +203,15 @@ def main():
     
     with col1:
         # Anomaly timeline chart
-        anomaly_df = pd.DataFrame(anomalies)
-        anomaly_df['timestamp'] = pd.to_datetime(anomaly_df['timestamp'])
+        anomaly_df = anomalies.copy()
         
         # Create scatter plot for anomalies
         fig_timeline = px.scatter(
             anomaly_df,
-            x='timestamp',
-            y='actual_cost',
+            x='date',
+            y='cost',
             color='severity',
-            size='deviation',
+            size='z_score',
             hover_data=['service', 'description'],
             title="Anomaly Timeline",
             color_discrete_map={
