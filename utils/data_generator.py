@@ -188,12 +188,12 @@ def generate_service_breakdown():
     for service, weight in zip(services, weights):
         cost = total_cost * weight * np.random.uniform(0.8, 1.2)  # Add some variation
         breakdown.append({
-            'service': service,
+            'Service': service,
             'cost': cost,
             'percentage': (cost / total_cost) * 100
         })
     
-    return breakdown
+    return pd.DataFrame(breakdown)
 
 def generate_optimization_recommendations():
     """Generate cost optimization recommendations"""

@@ -112,16 +112,16 @@ def main():
     col1, col2, col3, col4 = st.columns(4)
     
     # Generate sample data
-    cost_trend_data = generate_cost_trend_data(30)
+    cost_trend_data = cost_data  # Use the data already generated
     service_breakdown = generate_service_breakdown()
     
     # Calculate metrics
-    total_cost = cost_trend_data['Cost'].sum()
-    avg_daily_cost = cost_trend_data['Cost'].mean()
-    max_daily_cost = cost_trend_data['Cost'].max()
-    cost_change = ((cost_trend_data['Cost'].tail(7).mean() - 
-                   cost_trend_data['Cost'].head(7).mean()) / 
-                   cost_trend_data['Cost'].head(7).mean()) * 100
+    total_cost = cost_trend_data['cost'].sum()
+    avg_daily_cost = cost_trend_data['cost'].mean()
+    max_daily_cost = cost_trend_data['cost'].max()
+    cost_change = ((cost_trend_data['cost'].tail(7).mean() - 
+                   cost_trend_data['cost'].head(7).mean()) / 
+                  cost_trend_data['cost'].head(7).mean()) * 100
     
     # Display key metrics
     with col1:
@@ -159,17 +159,15 @@ def main():
     
     with col1:
         st.subheader("📈 Cost Trend Analysis")
-        
-        # Create trend chart
-        fig = px.line(
-            cost_trend_data, 
-            x='Date', 
-            y='Cost',
-            title="Daily AWS Spending Trend",
-            labels={'Cost': 'Daily Cost ($)', 'Date': 'Date'}
+           # Daily cost trend chart
+        fig_trend = px.line(
+            cost_trend_data,
+            x='date',
+            y='cost',
+            title="Daily Cost Trend (Last 30 Days)",
+            labels={'cost': 'Daily Cost ($)', 'date': 'Date'}
         )
-        
-        fig.update_layout(
+        fig_trend.update_layout(
             height=400,
             showlegend=False,
             xaxis_title="Date",
@@ -197,7 +195,7 @@ def main():
         # Service breakdown pie chart
         fig_pie = px.pie(
             service_breakdown.head(6), 
-            values='Cost', 
+            values='cost', 
             names='Service',
             title="Top 6 Services by Cost"
         )
@@ -211,7 +209,7 @@ def main():
             st.markdown(f"""
             <div class="service-card">
                 <strong>{row['Service']}</strong><br>
-                <span style="font-size: 1.2em; color: #007bff;">${row['Cost']:,.2f}</span>
+                <span style="font-size: 1.2em; color: #007bff;">${row['cost']:,.2f}</span>
                 <span style="float: right;">{row['Percentage']:.1f}%</span>
             </div>
             """, unsafe_allow_html=True)
@@ -228,16 +226,16 @@ def main():
         
         # Enhanced service breakdown table
         service_breakdown_enhanced = service_breakdown.copy()
-        service_breakdown_enhanced['Daily Average'] = service_breakdown_enhanced['Cost'] / 30
+        service_breakdown_enhanced['Daily Average'] = service_breakdown_enhanced['cost'] / 30
         service_breakdown_enhanced['Monthly Trend'] = ['↗️' if i % 2 == 0 else '↘️' for i in range(len(service_breakdown_enhanced))]
         
         st.dataframe(
-            service_breakdown_enhanced[['Service', 'Cost', 'Daily Average', 'Percentage', 'Monthly Trend']],
+            service_breakdown_enhanced[['Service', 'cost', 'Daily Average', 'percentage', 'Monthly Trend']],
             use_container_width=True,
             column_config={
-                'Cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
+                'cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
                 'Daily Average': st.column_config.NumberColumn('Daily Avg ($)', format='$%.2f'),
-                'Percentage': st.column_config.NumberColumn('Percentage (%)', format='%.1f%%')
+                'percentage': st.column_config.NumberColumn('Percentage (%)', format='%.1f%%')
             }
         )
         
@@ -245,9 +243,9 @@ def main():
         fig_bar = px.bar(
             service_breakdown.head(8),
             x='Service',
-            y='Cost',
+            y='cost',
             title="Service Cost Comparison",
-            color='Cost',
+            color='cost',
             color_continuous_scale='Blues'
         )
         fig_bar.update_layout(height=400)
@@ -262,15 +260,15 @@ def main():
         daily_stats['Week'] = daily_stats['Date'].dt.isocalendar().week
         
         # Weekly pattern analysis
-        weekly_pattern = daily_stats.groupby('Day of Week')['Cost'].mean().reset_index()
+        weekly_pattern = daily_stats.groupby('Day of Week')['cost'].mean().reset_index()
         weekly_pattern = weekly_pattern.reindex([6, 0, 1, 2, 3, 4, 5])  # Start with Monday
         
         fig_weekly = px.bar(
             weekly_pattern,
             x='Day of Week',
-            y='Cost',
+            y='cost',
             title="Average Cost by Day of Week",
-            color='Cost',
+            color='cost',
             color_continuous_scale='Viridis'
         )
         st.plotly_chart(fig_weekly, use_container_width=True)
@@ -278,16 +276,16 @@ def main():
         # Daily cost table
         st.markdown("**Recent Daily Costs:**")
         recent_costs = cost_trend_data.tail(10).copy()
-        recent_costs['Change'] = recent_costs['Cost'].pct_change() * 100
+        recent_costs['Change'] = recent_costs['cost'].pct_change() * 100
         recent_costs['Status'] = recent_costs['Change'].apply(
             lambda x: '📈' if x > 5 else '📉' if x < -5 else '➡️'
         )
         
         st.dataframe(
-            recent_costs[['Date', 'Cost', 'Change', 'Status']],
+            recent_costs[['Date', 'cost', 'Change', 'Status']],
             use_container_width=True,
             column_config={
-                'Cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
+                'cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
                 'Change': st.column_config.NumberColumn('Change (%)', format='%.1f%%')
             }
         )
@@ -298,7 +296,7 @@ def main():
         # Mock tag-based cost allocation
         tag_data = pd.DataFrame({
             'Environment': ['Production', 'Development', 'Staging', 'Testing'],
-            'Cost': [8500, 2200, 1100, 800],
+            'cost': [8500, 2200, 1100, 800],
             'Resources': [45, 18, 12, 8]
         })
         
@@ -307,7 +305,7 @@ def main():
         with col1:
             fig_env = px.pie(
                 tag_data,
-                values='Cost',
+                values='cost',
                 names='Environment',
                 title="Cost by Environment"
             )
@@ -319,18 +317,18 @@ def main():
                 x='Environment',
                 y='Resources',
                 title="Resource Count by Environment",
-                color='Cost',
+                color='cost',
                 color_continuous_scale='Blues'
             )
             st.plotly_chart(fig_resources, use_container_width=True)
         
         # Tag allocation table
-        tag_data['Cost per Resource'] = tag_data['Cost'] / tag_data['Resources']
+        tag_data['Cost per Resource'] = tag_data['cost'] / tag_data['Resources']
         st.dataframe(
             tag_data,
             use_container_width=True,
             column_config={
-                'Cost': st.column_config.NumberColumn('Total Cost ($)', format='$%.2f'),
+                'cost': st.column_config.NumberColumn('Total Cost ($)', format='$%.2f'),
                 'Cost per Resource': st.column_config.NumberColumn('Cost/Resource ($)', format='$%.2f')
             }
         )
@@ -339,7 +337,7 @@ def main():
         st.markdown("**Cost Forecasting**")
         
         # Simple forecast calculation
-        recent_trend = cost_trend_data.tail(7)['Cost'].mean()
+        recent_trend = cost_trend_data.tail(7)['cost'].mean()
         forecast_days = 30
         
         # Generate forecast data
@@ -361,7 +359,7 @@ def main():
         
         forecast_data = pd.DataFrame({
             'Date': forecast_dates,
-            'Cost': forecast_costs,
+            'cost': forecast_costs,
             'Type': 'Forecast'
         })
         
@@ -370,7 +368,7 @@ def main():
         historical_data['Type'] = 'Historical'
         
         combined_data = pd.concat([
-            historical_data[['Date', 'Cost', 'Type']],
+            historical_data[['Date', 'cost', 'Type']],
             forecast_data
         ])
         
@@ -378,7 +376,7 @@ def main():
         fig_forecast = px.line(
             combined_data,
             x='Date',
-            y='Cost',
+            y='cost',
             color='Type',
             title="30-Day Cost Forecast",
             color_discrete_map={'Historical': '#007bff', 'Forecast': '#ff6b6b'}
@@ -389,7 +387,7 @@ def main():
         
         # Forecast summary
         forecast_total = sum(forecast_costs)
-        current_monthly = cost_trend_data['Cost'].sum()
+        current_monthly = cost_trend_data['cost'].sum()
         
         col1, col2, col3 = st.columns(3)
         with col1:
