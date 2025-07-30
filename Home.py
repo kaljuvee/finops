@@ -11,7 +11,7 @@ import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
 
 from cost_monitor import CostMonitor
-from data_generator import generate_sample_data
+from data_generator import generate_cost_data, generate_service_breakdown
 
 # Page configuration
 st.set_page_config(
@@ -69,38 +69,43 @@ def main():
     # Initialize cost monitor
     cost_monitor = CostMonitor()
     
-    # Generate sample data for demo
-    sample_data = generate_sample_data()
+    # Generate sample data
+    cost_data = generate_cost_data(30)
+    service_breakdown = generate_service_breakdown()
     
     # Main dashboard content
     col1, col2, col3, col4 = st.columns(4)
     
+    # Calculate metrics from generated data
+    total_cost = cost_data['cost'].sum()
+    daily_avg = cost_data['cost'].mean()
+    
     with col1:
         st.metric(
             label="💰 Monthly Spend",
-            value=f"${sample_data['total_spend']:,.2f}",
-            delta=f"{sample_data['spend_change']:.1f}%"
+            value=f"${total_cost:,.2f}",
+            delta="3.6%"
         )
     
     with col2:
         st.metric(
             label="📈 Daily Average",
-            value=f"${sample_data['daily_avg']:,.2f}",
-            delta=f"{sample_data['daily_change']:.1f}%"
+            value=f"${daily_avg:,.2f}",
+            delta="3.3%"
         )
     
     with col3:
         st.metric(
             label="🎯 Budget Utilization",
-            value=f"{sample_data['budget_utilization']:.1f}%",
-            delta=f"{sample_data['budget_change']:.1f}%"
+            value="71.9%",
+            delta="4.6%"
         )
     
     with col4:
         st.metric(
             label="💡 Potential Savings",
-            value=f"${sample_data['potential_savings']:,.2f}",
-            delta="Identified"
+            value="$1,366.19",
+            delta="12.4%"
         )
     
     st.markdown("---")
@@ -111,23 +116,17 @@ def main():
     with col1:
         st.subheader("📊 Monthly Spend Trend")
         
-        # Generate trend data
-        dates = pd.date_range(start=datetime.now() - timedelta(days=30), end=datetime.now(), freq='D')
-        spend_data = pd.DataFrame({
-            'Date': dates,
-            'Spend': [abs(x) * 100 + 500 for x in pd.Series(range(len(dates))).apply(lambda x: (x % 7 - 3) * 50 + (x % 3 - 1) * 30)]
-        })
-        
-        fig = px.line(spend_data, x='Date', y='Spend', title="Daily AWS Spend")
+        # Use generated cost data
+        fig = px.line(cost_data, x='date', y='cost', title="Daily AWS Spend")
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.subheader("🔧 Service Breakdown")
         
-        # Service breakdown pie chart
-        services = ['EC2', 'S3', 'Lambda', 'RDS', 'CloudWatch', 'Other']
-        costs = [2500, 800, 300, 1200, 150, 450]
+        # Use generated service breakdown
+        services = [item['service'] for item in service_breakdown]
+        costs = [item['cost'] for item in service_breakdown]
         
         fig = px.pie(values=costs, names=services, title="Cost by AWS Service")
         fig.update_layout(height=400)
