@@ -302,21 +302,41 @@ def main():
         # Advanced settings
         st.subheader("⚙️ Advanced Settings")
         
+        st.markdown("""
+        **Changepoint Prior Scale** (0.001 - 0.500)
+        - Controls how flexible the trend can be
+        - **Low values (0.001-0.01)**: Rigid trend, fewer changepoints
+        - **Medium values (0.01-0.1)**: Balanced flexibility (recommended)
+        - **High values (0.1-0.5)**: Very flexible trend, many changepoints
+        - **Default**: 0.05 (good balance for most use cases)
+        """)
+        
         changepoint_prior_scale = st.slider(
             "Changepoint Prior Scale",
             min_value=0.001,
             max_value=0.5,
             value=0.05,
             step=0.001,
-            format="%.3f"
+            format="%.3f",
+            help="Controls trend flexibility. Higher values allow more trend changes but may overfit."
         )
+        
+        st.markdown("""
+        **Seasonality Prior Scale** (0.01 - 50.0)
+        - Controls the strength of seasonal patterns
+        - **Low values (0.01-1.0)**: Weak seasonality, more regularization
+        - **Medium values (1.0-10.0)**: Balanced seasonality (recommended)
+        - **High values (10.0-50.0)**: Strong seasonality, may overfit
+        - **Default**: 10.0 (good for business data with clear seasonality)
+        """)
         
         seasonality_prior_scale = st.slider(
             "Seasonality Prior Scale",
             min_value=0.01,
             max_value=50.0,
             value=10.0,
-            step=0.1
+            step=0.1,
+            help="Controls seasonal pattern strength. Higher values fit seasonality more closely."
         )
         
         if st.button("🔄 Regenerate Forecast"):
