@@ -11,7 +11,8 @@ import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), 'utils'))
 
 from cost_monitor import CostMonitor
-from data_generator import generate_cost_data, generate_service_breakdown
+from data_manager import data_manager
+from data_viewer import display_data_section, create_data_sidebar
 
 # Page configuration
 st.set_page_config(
@@ -66,12 +67,15 @@ def main():
         st.markdown("---")
         st.markdown("### Quick Stats")
         
+        # Add data management sidebar
+        create_data_sidebar(data_manager)
+        
     # Initialize cost monitor
     cost_monitor = CostMonitor()
     
-    # Generate sample data
-    cost_data = generate_cost_data(30)
-    service_breakdown = generate_service_breakdown()
+    # Get data from CSV files
+    cost_data = data_manager.get_cost_data(30)
+    service_breakdown = data_manager.get_service_breakdown()
     
     # Main dashboard content
     col1, col2, col3, col4 = st.columns(4)
@@ -120,17 +124,25 @@ def main():
         fig = px.line(cost_data, x='date', y='cost', title="Daily AWS Spend")
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Data download section
+        with st.expander("📥 Download Cost Data"):
+            display_data_section(cost_data, "Cost Data", "Daily AWS cost data with trends and seasonality")
     
     with col2:
         st.subheader("🔧 Service Breakdown")
         
         # Use generated service breakdown
-        services = [item['service'] for item in service_breakdown]
-        costs = [item['cost'] for item in service_breakdown]
+        services = service_breakdown['Service'].tolist()
+        costs = service_breakdown['cost'].tolist()
         
         fig = px.pie(values=costs, names=services, title="Cost by AWS Service")
         fig.update_layout(height=400)
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Data download section
+        with st.expander("📥 Download Service Breakdown Data"):
+            display_data_section(service_breakdown, "Service Breakdown", "Cost breakdown by AWS service")
     
     # Alerts section
     st.markdown("---")

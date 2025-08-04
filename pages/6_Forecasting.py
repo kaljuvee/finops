@@ -17,7 +17,8 @@ except ImportError:
     PROPHET_AVAILABLE = False
     st.error("Prophet library not available. Please install with: pip install prophet")
 
-from data_generator import generate_historical_cost_data, generate_forecast_scenarios
+from data_manager import data_manager
+from data_viewer import display_data_section, create_data_sidebar
 
 # Page configuration
 st.set_page_config(
@@ -103,20 +104,139 @@ def generate_prophet_forecast(historical_data, periods=90):
         return None, None
 
 def calculate_forecast_accuracy(actual, predicted):
-    """Calculate forecast accuracy metrics"""
-    mape = np.mean(np.abs((actual - predicted) / actual)) * 100
-    rmse = np.sqrt(np.mean((actual - predicted) ** 2))
-    mae = np.mean(np.abs(actual - predicted))
+    """
+    Calculate comprehensive forecast accuracy metrics
+    
+    Args:
+        actual: Array of actual values
+        predicted: Array of predicted values
+    
+    Returns:
+        Dictionary with accuracy metrics and interpretations
+    """
+    # Basic error metrics
+    errors = actual - predicted
+    abs_errors = np.abs(errors)
+    squared_errors = errors ** 2
+    
+    # Mean Absolute Error (MAE)
+    mae = np.mean(abs_errors)
+    
+    # Root Mean Square Error (RMSE)
+    rmse = np.sqrt(np.mean(squared_errors))
+    
+    # Mean Absolute Percentage Error (MAPE)
+    mape = np.mean(np.abs(errors / actual)) * 100
+    
+    # Mean Percentage Error (MPE) - bias indicator
+    mpe = np.mean(errors / actual) * 100
+    
+    # R-squared (Coefficient of Determination)
+    ss_res = np.sum(squared_errors)
+    ss_tot = np.sum((actual - np.mean(actual)) ** 2)
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+    
+    # Mean Absolute Scaled Error (MASE) - relative to naive forecast
+    if len(actual) > 1:
+        naive_errors = np.abs(np.diff(actual))
+        mase = mae / np.mean(naive_errors) if np.mean(naive_errors) != 0 else float('inf')
+    else:
+        mase = float('inf')
+    
+    # Directional Accuracy (DA) - percentage of correct trend predictions
+    if len(actual) > 1:
+        actual_direction = np.diff(actual) > 0
+        pred_direction = np.diff(predicted) > 0
+        da = np.mean(actual_direction == pred_direction) * 100
+    else:
+        da = 0
+    
+    # Model performance interpretation
+    performance_rating = "Excellent"
+    if mape > 20:
+        performance_rating = "Poor"
+    elif mape > 15:
+        performance_rating = "Fair"
+    elif mape > 10:
+        performance_rating = "Good"
+    elif mape > 5:
+        performance_rating = "Very Good"
     
     return {
-        'MAPE': mape,
+        'MAE': mae,
         'RMSE': rmse,
-        'MAE': mae
+        'MAPE': mape,
+        'MPE': mpe,
+        'R_squared': r_squared,
+        'MASE': mase,
+        'Directional_Accuracy': da,
+        'Performance_Rating': performance_rating,
+        'Interpretation': {
+            'MAE': f"Average absolute error: ${mae:.2f}",
+            'RMSE': f"Root mean square error: ${rmse:.2f}",
+            'MAPE': f"Average percentage error: {mape:.1f}%",
+            'MPE': f"Bias indicator: {mpe:.1f}% ({'overestimation' if mpe > 0 else 'underestimation'})",
+            'R_squared': f"Model fit: {r_squared:.3f} ({'excellent' if r_squared > 0.9 else 'good' if r_squared > 0.7 else 'fair' if r_squared > 0.5 else 'poor'} fit)",
+            'MASE': f"Scaled error: {mase:.2f} ({'better than naive' if mase < 1 else 'worse than naive'} forecast)",
+            'Directional_Accuracy': f"Trend accuracy: {da:.1f}% ({'excellent' if da > 80 else 'good' if da > 70 else 'fair' if da > 60 else 'poor'} trend prediction)"
+        }
     }
 
 def main():
     st.title("🔮 Advanced Cost Forecasting")
     st.markdown("AI-powered cost forecasting using Facebook Prophet and advanced statistical models")
+    
+    # Forecasting Method Documentation
+    with st.expander("📚 Forecasting Method & Model Details", expanded=False):
+        st.markdown("""
+        ### 🔮 Forecasting Algorithm: Facebook Prophet
+        
+        This system uses **Facebook Prophet**, an advanced time series forecasting model designed for business applications.
+        
+        #### 🤖 Model Architecture:
+        - **Decomposition Model**: `y(t) = g(t) + s(t) + h(t) + ε(t)`
+          - `g(t)`: Trend component (piecewise linear or logistic)
+          - `s(t)`: Seasonal component (Fourier series)
+          - `h(t)`: Holiday effects
+          - `ε(t)`: Error term
+        
+        #### 📊 Key Features:
+        - **Automatic Seasonality Detection**: Daily, weekly, yearly patterns
+        - **Holiday Effects**: Incorporates business holidays and events
+        - **Changepoint Detection**: Identifies trend changes automatically
+        - **Uncertainty Intervals**: Provides confidence bounds for predictions
+        - **Robust to Missing Data**: Handles gaps and outliers gracefully
+        
+        #### 🎯 Model Parameters:
+        - **Changepoint Prior Scale**: Controls trend flexibility (0.001-0.5)
+        - **Seasonality Prior Scale**: Controls seasonal strength (0.01-50.0)
+        - **Holidays Prior Scale**: Controls holiday effect strength
+        - **Seasonality Mode**: Additive or multiplicative seasonality
+        
+        #### 📈 Accuracy Metrics:
+        - **MAPE**: Mean Absolute Percentage Error (lower is better)
+        - **RMSE**: Root Mean Square Error (lower is better)
+        - **MAE**: Mean Absolute Error (lower is better)
+        - **R²**: Coefficient of Determination (higher is better)
+        - **Directional Accuracy**: Trend prediction accuracy (higher is better)
+        - **MASE**: Mean Absolute Scaled Error (relative to naive forecast)
+        
+        #### 🔍 Model Interpretation:
+        - **MAPE < 10%**: Excellent forecast accuracy
+        - **MAPE 10-15%**: Good forecast accuracy
+        - **MAPE 15-20%**: Fair forecast accuracy
+        - **MAPE > 20%**: Poor forecast accuracy
+        - **R² > 0.8**: Strong model fit
+        - **R² 0.6-0.8**: Moderate model fit
+        - **R² < 0.6**: Weak model fit
+        
+        #### 💡 Best Practices:
+        - Use at least 1 year of historical data for best results
+        - Include relevant holidays and business events
+        - Monitor changepoints for trend changes
+        - Validate forecasts with holdout data
+        - Update models regularly with new data
+        """)
     
     # Sidebar for forecasting controls
     with st.sidebar:
@@ -201,9 +321,12 @@ def main():
         
         if st.button("🔄 Regenerate Forecast"):
             st.success("Forecast regenerated with new parameters!")
+        
+        # Add data management sidebar
+        create_data_sidebar(data_manager)
     
-    # Generate sample historical data
-    historical_data = generate_historical_cost_data(days=365)
+    # Get historical data from CSV files
+    historical_data = data_manager.get_historical_cost_data()
     
     # Summary metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -336,6 +459,17 @@ def main():
                 
                 for insight in insights:
                     st.markdown(f"• {insight}")
+                
+                # Data download section
+                with st.expander("📥 Download Forecast Data"):
+                    # Create forecast DataFrame for download
+                    forecast_df = pd.DataFrame({
+                        'date': future_dates,
+                        'forecast': forecast_values,
+                        'upper_bound': forecast_upper,
+                        'lower_bound': forecast_lower
+                    })
+                    display_data_section(forecast_df, "Forecast Data", "Predicted costs with confidence intervals")
     
     else:
         # Fallback visualization without Prophet
@@ -376,6 +510,10 @@ def main():
         st.plotly_chart(fig, use_container_width=True)
     
     # Detailed analysis tabs
+    # Data download section for historical data
+    with st.expander("📥 Download Historical Data"):
+        display_data_section(historical_data, "Historical Cost Data", "Historical AWS cost data used for forecasting")
+    
     st.markdown("---")
     st.subheader("🔍 Detailed Forecast Analysis")
     
@@ -395,26 +533,58 @@ def main():
         with col1:
             # Performance metrics
             if PROPHET_AVAILABLE and model:
-                # Calculate cross-validation metrics (mock for demo)
-                metrics = {
-                    'MAPE': 8.5,
-                    'RMSE': 245.3,
-                    'MAE': 189.7,
-                    'R²': 0.92
-                }
+                # Calculate real performance metrics using historical data
+                # Use last 30 days for validation
+                validation_data = historical_data.tail(30)
+                actual_values = validation_data['cost'].values
                 
-                st.markdown("""
+                # Generate predictions for validation period
+                validation_forecast = model.predict(
+                    pd.DataFrame({'ds': validation_data['date']})
+                )
+                predicted_values = validation_forecast['yhat'].values
+                
+                # Calculate comprehensive metrics
+                metrics = calculate_forecast_accuracy(actual_values, predicted_values)
+                
+                # Performance summary
+                st.markdown(f"""
                 <div class="model-performance">
-                    <h4>📊 Accuracy Metrics</h4>
-                    <p><strong>MAPE:</strong> {:.1f}% (Mean Absolute Percentage Error)</p>
-                    <p><strong>RMSE:</strong> ${:.2f} (Root Mean Square Error)</p>
-                    <p><strong>MAE:</strong> ${:.2f} (Mean Absolute Error)</p>
-                    <p><strong>R²:</strong> {:.3f} (Coefficient of Determination)</p>
+                    <h4>📊 Model Performance Summary</h4>
+                    <p><strong>Overall Rating:</strong> <span style="color: {'green' if metrics['Performance_Rating'] in ['Excellent', 'Very Good'] else 'orange' if metrics['Performance_Rating'] == 'Good' else 'red'}">{metrics['Performance_Rating']}</span></p>
+                    <p><strong>MAPE:</strong> {metrics['MAPE']:.1f}% (Mean Absolute Percentage Error)</p>
+                    <p><strong>RMSE:</strong> ${metrics['RMSE']:.2f} (Root Mean Square Error)</p>
+                    <p><strong>MAE:</strong> ${metrics['MAE']:.2f} (Mean Absolute Error)</p>
+                    <p><strong>R²:</strong> {metrics['R_squared']:.3f} (Coefficient of Determination)</p>
+                    <p><strong>Directional Accuracy:</strong> {metrics['Directional_Accuracy']:.1f}% (Trend Prediction)</p>
                 </div>
-                """.format(
-                    metrics['MAPE'], metrics['RMSE'], 
-                    metrics['MAE'], metrics['R²']
-                ), unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
+                # Detailed interpretation
+                st.markdown("**🔍 Model Interpretation**")
+                for metric, interpretation in metrics['Interpretation'].items():
+                    st.markdown(f"• **{metric}**: {interpretation}")
+                
+                # Model insights
+                st.markdown("**💡 Key Insights**")
+                if metrics['MAPE'] < 10:
+                    st.success("✅ Excellent forecast accuracy - model is performing very well")
+                elif metrics['MAPE'] < 15:
+                    st.info("✅ Good forecast accuracy - model is performing well")
+                else:
+                    st.warning("⚠️ Forecast accuracy needs improvement - consider model tuning")
+                
+                if metrics['R_squared'] > 0.8:
+                    st.success("✅ Strong model fit - captures most variance in the data")
+                elif metrics['R_squared'] > 0.6:
+                    st.info("✅ Moderate model fit - captures significant variance")
+                else:
+                    st.warning("⚠️ Weak model fit - consider additional features or different model")
+                
+                if metrics['Directional_Accuracy'] > 70:
+                    st.success("✅ Good trend prediction - model captures direction well")
+                else:
+                    st.warning("⚠️ Poor trend prediction - model struggles with direction")
             
             # Model comparison
             st.markdown("**🏆 Model Comparison**")
@@ -432,28 +602,53 @@ def main():
             # Residual analysis
             st.markdown("**📈 Residual Analysis**")
             
-            # Generate mock residuals
-            residuals = np.random.normal(0, 50, 100)
-            dates_residual = pd.date_range(start=datetime.now() - timedelta(days=100), periods=100, freq='D')
-            
-            fig_residual = px.scatter(
-                x=dates_residual,
-                y=residuals,
-                title="Forecast Residuals Over Time",
-                labels={'x': 'Date', 'y': 'Residual ($)'}
-            )
-            fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
-            
-            st.plotly_chart(fig_residual, use_container_width=True)
-            
-            # Residual statistics
-            st.markdown(f"""
-            **Residual Statistics:**
-            - Mean: ${np.mean(residuals):.2f}
-            - Std Dev: ${np.std(residuals):.2f}
-            - Skewness: {np.random.uniform(-0.5, 0.5):.3f}
-            - Kurtosis: {np.random.uniform(2.5, 3.5):.3f}
-            """)
+            if PROPHET_AVAILABLE and model:
+                # Calculate real residuals
+                residuals = actual_values - predicted_values
+                dates_residual = validation_data['date']
+                
+                fig_residual = px.scatter(
+                    x=dates_residual,
+                    y=residuals,
+                    title="Forecast Residuals Over Time",
+                    labels={'x': 'Date', 'y': 'Residual ($)'}
+                )
+                fig_residual.add_hline(y=0, line_dash="dash", line_color="red")
+                
+                st.plotly_chart(fig_residual, use_container_width=True)
+                
+                # Residual statistics
+                residual_mean = np.mean(residuals)
+                residual_std = np.std(residuals)
+                residual_skew = pd.Series(residuals).skew()
+                residual_kurt = pd.Series(residuals).kurtosis()
+                
+                st.markdown(f"""
+                **Residual Statistics:**
+                - **Mean:** ${residual_mean:.2f} ({'unbiased' if abs(residual_mean) < 10 else 'biased'})
+                - **Std Dev:** ${residual_std:.2f} (measure of forecast uncertainty)
+                - **Skewness:** {residual_skew:.3f} ({'symmetric' if abs(residual_skew) < 0.5 else 'skewed'})
+                - **Kurtosis:** {residual_kurt:.3f} ({'normal' if abs(residual_kurt) < 1 else 'heavy-tailed'})
+                """)
+                
+                # Residual interpretation
+                st.markdown("**🔍 Residual Interpretation**")
+                if abs(residual_mean) < 10:
+                    st.success("✅ Residuals are unbiased (mean close to zero)")
+                else:
+                    st.warning("⚠️ Residuals show bias - model may be systematically over/under-predicting")
+                
+                if residual_std < 50:
+                    st.success("✅ Low forecast uncertainty")
+                else:
+                    st.warning("⚠️ High forecast uncertainty - consider model improvements")
+                
+                if abs(residual_skew) < 0.5:
+                    st.success("✅ Residuals are normally distributed")
+                else:
+                    st.warning("⚠️ Residuals are skewed - model assumptions may be violated")
+            else:
+                st.info("Residual analysis requires Prophet model to be available")
     
     with tab2:
         st.markdown("**Trend Decomposition Analysis**")

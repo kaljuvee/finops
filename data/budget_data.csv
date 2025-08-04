@@ -1,0 +1,4 @@
+name,budget_amount,spent_amount,remaining_amount,utilization,forecast,status
+Production Environment,8000.0,6450.0,1550.0,80.6,7800.0,On Track
+Development Environment,2000.0,1850.0,150.0,92.5,2100.0,At Risk
+Data Analytics,3000.0,2100.0,900.0,70.0,2800.0,On Track

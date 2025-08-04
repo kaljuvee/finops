@@ -10,7 +10,8 @@ import numpy as np
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
-from data_generator import generate_cost_data, generate_service_breakdown
+from data_manager import data_manager
+from data_viewer import display_data_section, create_data_sidebar
 
 # Page configuration
 st.set_page_config(
@@ -51,9 +52,9 @@ def main():
     st.title("📊 Cost Monitoring & Visualization")
     st.markdown("Real-time AWS cost monitoring and analysis dashboard")
     
-    # Generate sample data
-    cost_data = generate_cost_data(30)
-    service_breakdown = generate_service_breakdown()
+    # Get data from CSV files
+    cost_data = data_manager.get_cost_data(30)
+    service_breakdown = data_manager.get_service_breakdown()
     
     # Sidebar filters
     with st.sidebar:
@@ -99,6 +100,9 @@ def main():
             default=["us-east-1", "us-west-2"]
         )
         
+        # Add data management sidebar
+        create_data_sidebar(data_manager)
+        
         st.markdown("---")
         
         # Export options
@@ -111,9 +115,9 @@ def main():
     # Main content area
     col1, col2, col3, col4 = st.columns(4)
     
-    # Generate sample data
+    # Get data from CSV files
     cost_trend_data = cost_data  # Use the data already generated
-    service_breakdown = generate_service_breakdown()
+    service_breakdown = data_manager.get_service_breakdown()
     
     # Calculate metrics
     total_cost = cost_trend_data['cost'].sum()
@@ -188,6 +192,10 @@ def main():
             st.info(f"📈 Costs have increased by {cost_change:.1f}% over the last week")
         else:
             st.success(f"📉 Costs have decreased by {abs(cost_change):.1f}% over the last week")
+        
+        # Data download section
+        with st.expander("📥 Download Cost Trend Data"):
+            display_data_section(cost_trend_data, "Cost Trend Data", "Daily cost data with trends and analysis")
     
     with col2:
         st.subheader("🔧 Service Breakdown")
@@ -210,9 +218,13 @@ def main():
             <div class="service-card">
                 <strong>{row['Service']}</strong><br>
                 <span style="font-size: 1.2em; color: #007bff;">${row['cost']:,.2f}</span>
-                <span style="float: right;">{row['Percentage']:.1f}%</span>
+                <span style="float: right;">{row['percentage']:.1f}%</span>
             </div>
             """, unsafe_allow_html=True)
+        
+        # Data download section
+        with st.expander("📥 Download Service Breakdown Data"):
+            display_data_section(service_breakdown, "Service Breakdown", "Cost breakdown by AWS service")
     
     st.markdown("---")
     
@@ -256,8 +268,8 @@ def main():
         
         # Daily cost analysis
         daily_stats = cost_trend_data.copy()
-        daily_stats['Day of Week'] = daily_stats['Date'].dt.day_name()
-        daily_stats['Week'] = daily_stats['Date'].dt.isocalendar().week
+        daily_stats['Day of Week'] = daily_stats['date'].dt.day_name()
+        daily_stats['Week'] = daily_stats['date'].dt.isocalendar().week
         
         # Weekly pattern analysis
         weekly_pattern = daily_stats.groupby('Day of Week')['cost'].mean().reset_index()
@@ -282,7 +294,7 @@ def main():
         )
         
         st.dataframe(
-            recent_costs[['Date', 'cost', 'Change', 'Status']],
+            recent_costs[['date', 'cost', 'Change', 'Status']],
             use_container_width=True,
             column_config={
                 'cost': st.column_config.NumberColumn('Cost ($)', format='$%.2f'),
@@ -342,7 +354,7 @@ def main():
         
         # Generate forecast data
         forecast_dates = pd.date_range(
-            start=cost_trend_data['Date'].max() + timedelta(days=1),
+            start=cost_trend_data['date'].max() + timedelta(days=1),
             periods=forecast_days,
             freq='D'
         )
@@ -368,14 +380,14 @@ def main():
         historical_data['Type'] = 'Historical'
         
         combined_data = pd.concat([
-            historical_data[['Date', 'cost', 'Type']],
+            historical_data[['date', 'cost', 'Type']],
             forecast_data
         ])
         
         # Forecast chart
         fig_forecast = px.line(
             combined_data,
-            x='Date',
+            x='date',
             y='cost',
             color='Type',
             title="30-Day Cost Forecast",

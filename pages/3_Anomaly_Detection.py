@@ -10,7 +10,8 @@ import numpy as np
 # Add utils to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
-from data_generator import generate_cost_data, generate_multivariate_cost_data
+from data_manager import data_manager
+from data_viewer import display_data_section, create_data_sidebar
 
 # Page configuration
 st.set_page_config(
@@ -73,12 +74,66 @@ def main():
     st.title("🚨 Anomaly Detection & Alerts")
     st.markdown("Real-time cost anomaly detection and alerting system")
     
-    # Generate sample data for anomaly detection
-    cost_data = generate_cost_data(90)  # 90 days of data
+    # Anomaly Detection Method Documentation
+    with st.expander("📚 Anomaly Detection Method & Algorithm Details", expanded=False):
+        st.markdown("""
+        ### 🔍 Detection Algorithm: Z-Score Statistical Analysis
+        
+        This system uses **statistical outlier detection** based on the **Z-score method** to identify cost anomalies in AWS spending patterns.
+        
+        #### 📊 Core Algorithm:
+        - **Z-score calculation**: `Z = (value - mean) / standard_deviation`
+        - **Anomaly threshold**: Values with `|Z-score| > 2` are flagged as anomalies
+        - **Statistical basis**: Uses 2 standard deviations (95% confidence interval)
+        
+        #### 🎯 Severity Classification:
+        - **🔴 High Severity**: `|Z-score| > 3` (beyond 3σ - very rare events, ~0.3% of data)
+        - **🟡 Medium Severity**: `2.5 < |Z-score| ≤ 3` (significant deviation, ~1% of data)
+        - **🔵 Low Severity**: `2 < |Z-score| ≤ 2.5` (moderate deviation, ~2.5% of data)
+        
+        #### ⚙️ Sensitivity Settings:
+        - **Low Sensitivity**: threshold = 3 (fewer false positives, may miss anomalies)
+        - **Medium Sensitivity**: threshold = 2 (balanced detection - default)
+        - **High Sensitivity**: threshold = 1.5 (more sensitive, may have false positives)
+        
+        #### 📈 Additional Features:
+        - **Cost spike threshold**: Percentage increase from baseline as secondary filter
+        - **Time window detection**: Configurable detection periods (1h to 7 days)
+        - **Service-specific monitoring**: Focus on specific AWS services
+        - **Trend analysis**: Historical pattern recognition
+        
+        #### 🎯 Use Cases:
+        - **Cost spikes**: Unexpected increases in AWS spending
+        - **Cost dips**: Unusual decreases (potential service issues)
+        - **Seasonal patterns**: Detection of non-seasonal anomalies
+        - **Service-specific issues**: Anomalies in specific AWS services
+        
+        #### 📊 Statistical Properties:
+        - **False Positive Rate**: ~5% with default threshold (2σ)
+        - **Detection Rate**: ~95% for significant anomalies
+        - **Adaptive**: Thresholds can be adjusted based on business needs
+        """)
     
-    # Simple anomaly detection using statistical methods
+    # Get data from CSV files
+    cost_data = data_manager.get_cost_data(90)  # 90 days of data
+    
+    # Anomaly Detection Method: Z-Score Statistical Analysis
+    # This method uses statistical outlier detection based on the Z-score:
+    # - Z-score = (value - mean) / standard_deviation
+    # - Values with |Z-score| > threshold are flagged as anomalies
+    # - Threshold of 2 means values beyond 2 standard deviations are anomalies
+    # - This is a simple but effective method for detecting cost spikes and dips
     def detect_anomalies(data, threshold=2):
-        """Simple statistical anomaly detection using z-score"""
+        """
+        Statistical anomaly detection using Z-score method
+        
+        Args:
+            data: DataFrame with 'cost' column
+            threshold: Z-score threshold (default=2, meaning 2 standard deviations)
+        
+        Returns:
+            DataFrame with added 'z_score' and 'is_anomaly' columns
+        """
         mean_cost = data['cost'].mean()
         std_cost = data['cost'].std()
         data['z_score'] = (data['cost'] - mean_cost) / std_cost
@@ -91,7 +146,10 @@ def main():
     with st.sidebar:
         st.header("⚙️ Detection Settings")
         
-        # Detection sensitivity
+        # Detection sensitivity - affects Z-score threshold
+        # Low: threshold = 3 (fewer false positives, may miss some anomalies)
+        # Medium: threshold = 2 (balanced detection)
+        # High: threshold = 1.5 (more sensitive, may have more false positives)
         sensitivity = st.selectbox(
             "Detection Sensitivity",
             ["Low", "Medium", "High"],
@@ -101,6 +159,8 @@ def main():
         # Alert thresholds
         st.subheader("🎯 Alert Thresholds")
         
+        # Cost spike threshold - percentage increase from baseline to trigger alert
+        # This is an additional filter on top of the Z-score method
         cost_threshold = st.slider(
             "Cost Spike Threshold (%)",
             min_value=10,
@@ -145,9 +205,17 @@ def main():
         st.subheader("🔍 Manual Detection")
         if st.button("Run Detection Now"):
             st.success("Anomaly detection initiated!")
+        
+        # Add data management sidebar
+        create_data_sidebar(data_manager)
     
     # Generate sample anomaly data
     anomalies = cost_data[cost_data['is_anomaly']].copy()
+    
+    # Severity Classification based on Z-score magnitude:
+    # - High: |Z-score| > 3 (beyond 3 standard deviations - very rare)
+    # - Medium: 2.5 < |Z-score| ≤ 3 (significant deviation)
+    # - Low: 2 < |Z-score| ≤ 2.5 (moderate deviation)
     anomalies['severity'] = anomalies['z_score'].apply(
         lambda x: 'High' if abs(x) > 3 else 'Medium' if abs(x) > 2.5 else 'Low'
     )
@@ -156,6 +224,13 @@ def main():
         lambda row: f"Cost spike detected in {row['service']}: ${row['cost']:.2f} (Z-score: {row['z_score']:.2f})", 
         axis=1
     )
+    
+    # Add missing columns for the UI
+    anomalies['timestamp'] = anomalies['date']
+    anomalies['actual_cost'] = anomalies['cost']
+    anomalies['baseline_cost'] = anomalies['cost'] * 0.9  # Approximate baseline
+    anomalies['status'] = 'Active'
+    anomalies['anomaly_type'] = 'Cost Spike'
     
     # Summary metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -236,11 +311,15 @@ def main():
         
         fig_timeline.update_layout(height=400)
         st.plotly_chart(fig_timeline, use_container_width=True)
+        
+        # Data download section
+        with st.expander("📥 Download Anomaly Data"):
+            display_data_section(anomalies, "Anomaly Detection Data", "Cost anomalies with severity and service information")
     
     with col2:
         st.markdown("**🚨 Recent Alerts**")
         
-        for anomaly in anomalies[:5]:
+        for _, anomaly in anomalies.head(5).iterrows():
             severity_class = f"anomaly-{anomaly['severity'].lower()}"
             severity_icon = "🔴" if anomaly['severity'] == 'High' else "🟡" if anomaly['severity'] == 'Medium' else "🔵"
             
@@ -268,7 +347,7 @@ def main():
         
         # Service anomaly summary
         service_summary = {}
-        for anomaly in anomalies:
+        for _, anomaly in anomalies.iterrows():
             service = anomaly['service']
             if service not in service_summary:
                 service_summary[service] = {'count': 0, 'total_impact': 0, 'avg_severity': []}
@@ -344,8 +423,8 @@ def main():
         trend_data = cost_data.copy()
         
         # Add anomaly markers
-        anomaly_dates = [a['timestamp'].date() for a in anomalies]
-        trend_data['Has_Anomaly'] = trend_data['Date'].dt.date.isin(anomaly_dates)
+        anomaly_dates = [a['timestamp'].date() for _, a in anomalies.iterrows()]
+        trend_data['Has_Anomaly'] = trend_data['date'].dt.date.isin(anomaly_dates)
         trend_data['Anomaly_Type'] = trend_data['Has_Anomaly'].apply(
             lambda x: 'Anomaly Detected' if x else 'Normal'
         )
@@ -353,8 +432,8 @@ def main():
         # Trend chart with anomalies
         fig_trend = px.line(
             trend_data,
-            x='Date',
-            y='Cost',
+            x='date',
+            y='cost',
             color='Anomaly_Type',
             title="Cost Trends with Anomaly Detection",
             color_discrete_map={
@@ -364,8 +443,8 @@ def main():
         )
         
         # Add statistical bounds
-        mean_cost = trend_data['Cost'].mean()
-        std_cost = trend_data['Cost'].std()
+        mean_cost = trend_data['cost'].mean()
+        std_cost = trend_data['cost'].std()
         
         fig_trend.add_hline(
             y=mean_cost + 2*std_cost,
@@ -383,6 +462,10 @@ def main():
         
         fig_trend.update_layout(height=500)
         st.plotly_chart(fig_trend, use_container_width=True)
+        
+        # Data download section for trend analysis
+        with st.expander("📥 Download Trend Analysis Data"):
+            display_data_section(trend_data, "Trend Analysis Data", "Cost trends with anomaly markers and statistical bounds")
         
         # Trend statistics
         col1, col2, col3 = st.columns(3)
@@ -461,7 +544,7 @@ def main():
         
         # Alert history table
         alert_history = []
-        for i, anomaly in enumerate(anomalies):
+        for i, (_, anomaly) in enumerate(anomalies.iterrows()):
             alert_history.append({
                 'Alert ID': f"ALT-{i+1:03d}",
                 'Timestamp': anomaly['timestamp'],

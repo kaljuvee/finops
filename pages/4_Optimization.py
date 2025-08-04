@@ -11,7 +11,8 @@ import numpy as np
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
 from optimizer import CostOptimizer
-from data_generator import generate_optimization_recommendations, generate_service_breakdown
+from data_manager import data_manager
+from data_viewer import display_data_section, create_data_sidebar
 
 # Page configuration
 st.set_page_config(
@@ -151,10 +152,13 @@ def main():
         - 🔄 In Progress: {in_progress}
         - ⏳ Pending: {pending}
         """)
+        
+        # Add data management sidebar
+        create_data_sidebar(data_manager)
     
-    # Generate sample data
-    recommendations = generate_optimization_recommendations()
-    service_data = generate_service_breakdown()
+    # Get data from CSV files
+    recommendations = data_manager.get_optimization_recommendations().to_dict('records')
+    service_data = data_manager.get_service_breakdown()
     
     # Calculate summary metrics
     total_savings = sum(rec['potential_savings'] for rec in recommendations)
