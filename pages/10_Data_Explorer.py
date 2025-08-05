@@ -195,6 +195,72 @@ def main():
     st.title("🔍 Data Explorer")
     st.markdown("Explore, visualize, and download all FinOps datasets")
     
+    # Data Explorer Documentation
+    with st.expander("📚 Data Explorer Guide & Features", expanded=False):
+        st.markdown("""
+        ### 🔍 Data Explorer Overview
+        
+        The Data Explorer provides a comprehensive interface for exploring, analyzing, and downloading all FinOps datasets.
+        
+        #### 📊 Available Datasets:
+        - **Cost Data**: Daily AWS cost data with trends and seasonality (30 days)
+        - **Service Breakdown**: Cost distribution by AWS service (EC2, S3, RDS, etc.)
+        - **Anomaly Data**: Cost data with detected anomalies and severity levels
+        - **Multivariate Data**: Multi-dimensional cost data with usage metrics and API calls
+        - **Forecast Scenarios**: Different forecasting scenarios (Conservative, Baseline, Aggressive)
+        - **Optimization Recommendations**: Cost optimization suggestions with savings estimates
+        - **Budget Data**: Budget tracking and utilization data by environment
+        - **Forecast Data**: Historical vs forecasted costs with confidence intervals
+        - **Cost Allocation**: Department and project cost allocation with variance analysis
+        - **Tag Analysis**: Cost analysis by AWS tags (Environment, Team, Application, CostCenter)
+        - **Historical Cost Data**: Long-term historical cost trends (365 days)
+        
+        #### 🔧 Key Features:
+        - **📋 Data Preview**: View first 10 rows of any dataset
+        - **📊 Automatic Visualizations**: Smart chart generation based on data types
+        - **📈 Statistical Analysis**: Comprehensive statistics and missing data analysis
+        - **📥 Data Download**: Export in CSV, JSON, or Excel formats
+        - **🔍 Data Quality Assessment**: Column types, null values, and data ranges
+        - **📊 Dataset Comparison**: Overview table of all available datasets
+        
+        #### 📈 Visualization Types:
+        - **Time Series**: For temporal data showing trends over time
+        - **Distribution Histograms**: For numeric data showing data spread
+        - **Correlation Heatmaps**: For multiple numeric columns showing relationships
+        - **Bar Charts**: For categorical data showing frequency distributions
+        - **Scatter Plots**: For numeric pairs showing relationships
+        - **Box Plots**: For numeric data showing quartiles and outliers
+        
+        #### 💡 Analysis Insights:
+        - **Data Structure**: Column types, null counts, and data ranges
+        - **Statistical Summary**: Mean, median, standard deviation, quartiles
+        - **Missing Data**: Identification and percentage of missing values
+        - **Data Quality**: Assessment of data completeness and consistency
+        - **Trend Analysis**: For time series data, identification of patterns
+        
+        #### 🎯 Best Practices:
+        - Start with the data overview to understand structure
+        - Use visualizations to identify patterns and outliers
+        - Check missing data analysis for data quality issues
+        - Export data for further analysis in external tools
+        - Compare datasets to understand relationships between different data types
+        
+        #### 🔍 Data Quality Indicators:
+        - **Complete Data**: No missing values in critical columns
+        - **Consistent Data**: Data types match expected formats
+        - **Valid Ranges**: Values within expected business ranges
+        - **Temporal Consistency**: Date ranges align with business expectations
+        - **Statistical Validity**: Distributions and correlations make business sense
+        
+        #### 📊 Interpreting Visualizations:
+        - **Time Series**: Look for trends, seasonality, and anomalies
+        - **Distributions**: Identify skewness, outliers, and central tendency
+        - **Correlations**: Understand relationships between variables
+        - **Bar Charts**: Identify most common categories and patterns
+        - **Scatter Plots**: Find relationships and clusters in data
+        - **Box Plots**: Detect outliers and understand data spread
+        """)
+    
     # Get all dataset information
     datasets = get_dataset_info()
     
@@ -252,7 +318,27 @@ def main():
     
     # Load the full dataset
     try:
-        df = data_manager.get_data(selected_data_info['filename'].replace('.csv', ''))
+        # Map filename to data type for data manager
+        filename_to_type = {
+            'cost_data.csv': 'cost_data',
+            'service_breakdown.csv': 'service_breakdown',
+            'anomaly_data.csv': 'anomaly_data',
+            'multivariate_cost_data.csv': 'multivariate_data',
+            'forecast_scenarios.csv': 'forecast_scenarios',
+            'optimization_recommendations.csv': 'optimization_recommendations',
+            'budget_data.csv': 'budget_data',
+            'forecast_data.csv': 'forecast_data',
+            'cost_allocation.csv': 'cost_allocation',
+            'tag_analysis.csv': 'tag_analysis',
+            'historical_cost_data.csv': 'historical_cost_data'
+        }
+        
+        data_type = filename_to_type.get(selected_data_info['filename'])
+        if data_type:
+            df = data_manager.get_data(data_type)
+        else:
+            # Fallback: read directly from CSV
+            df = pd.read_csv(f"data/{selected_data_info['filename']}")
         
         # Data overview
         st.markdown("---")
